@@ -1,0 +1,40 @@
+{
+    "models"         : {
+        "User": {
+            "table"     : "users",
+            "entrypoint": {
+                "ID"   : "id",
+                "Email": "email"
+            },
+            "after"     : [
+                {
+                    "method"   : "related",
+                    "table"    : "password_resets",
+                    "input"    : "email",
+                    "reference": "email"
+                }
+            ]
+        }
+    },
+    "table_mutations": {
+        "users": {
+            "ignore"    : [
+                "is_skipped"
+            ],
+            "attributes": {
+                "remember_token": {
+                    "method": "static",
+                    "value" : null
+                },
+                "password": {
+                    "method": "static",
+                    "value" : "secret"
+                },
+                "name"          : {
+                    "method": "faker",
+                    "value" : "firstName"
+                }
+            }
+        }
+    }
+}

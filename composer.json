@@ -1,0 +1,39 @@
+{
+    "name": "kickenhio/laravel-sql-snapshot",
+    "description": "Sync production-development Database helper library",
+    "keywords": ["php"],
+    "homepage": "https://github.com/kickenhio/laravel-sql-snapshot",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "KickenhiO",
+            "email": "kickenhio@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^7.4 || ^8.0",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "illuminate/config": "^7 || ^8 || ^9",
+        "illuminate/support": "^7 || ^8 || ^9",
+        "illuminate/database": "^7 || ^8 || ^9"
+    },
+    "autoload": {
+        "psr-4": {
+            "Kickenhio\\LaravelSqlSnapshot\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Kickenhio\\LaravelSqlSnapshot\\SnapshotServiceProvider"
+            ],
+            "aliases": {
+                "Snapshot": "Kickenhio\\LaravelSqlSnapshot\\Facades"
+            }
+        }
+    },
+    "minimum-stability": "dev"
+}
