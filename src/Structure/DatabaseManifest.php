@@ -13,6 +13,7 @@ class DatabaseManifest
      * @param EntrypointModel $model
      *
      * @return void
+     * @throws InvalidManifestSyntaxException
      */
     public function addModel(EntrypointModel $model): void
     {
@@ -21,6 +22,14 @@ class DatabaseManifest
         }
 
         $this->models[$model->getName()] = $model;
+    }
+
+    /**
+     * @return array
+     */
+    public function entrypointModels() : array
+    {
+        return $this->models;
     }
 
     /**

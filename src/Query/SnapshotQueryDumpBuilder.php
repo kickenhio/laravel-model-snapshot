@@ -55,23 +55,17 @@ class SnapshotQueryDumpBuilder
         }
 
         $manifestModel = $this->manifest->getEntrypointModel($model);
-
-        if (is_array($entryPointTarget)) {
-            $entrypointColumn = $entryPointTarget['column'];
-        } else {
-            $entrypointColumn = $entryPointTarget;
-        }
-
+        $entrypointColumn = $manifestModel->getEntrypoint($entryPointTarget);
         $tableName = $manifestModel->getTableName();
 
         $rows = $this->getConnection()->table($tableName)
-            ->where($entrypointColumn, '=', $value)
+            ->where($entrypointColumn['column'], '=', $value)
             ->get()
             ->map(function ($row) use ($model, $tableName) {
                 return new ModelRetriever($this, $this->getModel($model), new Row($tableName, (array) $row));
             });
 
-        return new SnapshotResult($rows, $this->formatException($rows));
+        return new SnapshotResult($rows, $this->formatException($rows, $entrypointColumn));
     }
 
     /**
@@ -108,27 +102,28 @@ class SnapshotQueryDumpBuilder
 
     /**
      * @param Collection $rows
+     * @param array $entryPoint
      *
      * @return array
      */
-    protected function formatException(Collection $rows): array
+    protected function formatException(Collection $rows, array $entryPoint): array
     {
-        return [];
+        if ($rows->count() < 2) {
+            return [];
+        }
 
-        //if ($rows->count() < 2) {
-        //    return [];
-        //}
-        //
-        //return $rows->map(function($row) use ($entryPointTarget, $entrypointColumn, $model) {
-        //    if (!is_array($entryPointTarget) || !isset($entryPointTarget['dupeInfo'])) {
-        //        return $row->{$model->getReference()};
-        //    }
-        //
-        //    $data = collect($entryPointTarget['dupeInfo'])->map(function ($key) use ($row) {
-        //        return $key . ':' . $row->{$key};
-        //    });
-        //
-        //    return $row->{$model->getReference()} . ' (' . $data->implode(',') . ')';
-        //})->toArray();
+        $log = $rows->map(function(ModelRetriever $i) use ($entryPoint) {
+            if (!isset($entryPoint['dupeInfo'])) {
+                return $i->getRow()->id();
+            }
+
+            $data = collect($entryPoint['dupeInfo'])->map(function ($key) use ($i) {
+                return $key . ':' . $i->getRow()->property($key);
+            });
+
+            return $i->getRow()->id() . ' (' . $data->implode(',') . ')';
+        });
+
+        return $log->toArray();
     }
 }

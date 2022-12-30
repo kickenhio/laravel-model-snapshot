@@ -35,6 +35,18 @@ class Queries implements IteratorAggregate
     }
 
     /**
+     * @param callable $callback
+     *
+     * @return void
+     */
+    public function each(callable $callback): void
+    {
+        foreach ($this->items as $row) {
+            $callback($row);
+        }
+    }
+
+    /**
      * @return Queries
      */
     public function withoutComments(): Queries

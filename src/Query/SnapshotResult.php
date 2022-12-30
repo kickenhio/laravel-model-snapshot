@@ -48,7 +48,7 @@ class SnapshotResult
         return $this->rows->last();
     }
 
-    public function each(callable $callback)
+    public function each(callable $callback): void
     {
         foreach ($this->rows as $row) {
             $callback($row);

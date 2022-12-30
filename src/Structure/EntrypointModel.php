@@ -4,17 +4,17 @@ class EntrypointModel extends Relations\BeforeAfterCallbacks
 {
     protected string $name;
     protected string $tableName;
-    protected array $entrypoints;
+    protected array $entrypoint;
 
     /**
      * @param string $model
      * @param string $tableName
-     * @param array $entrypoints
+     * @param array $entrypoint
      */
-    public function __construct(string $model, string $tableName, array $entrypoints) {
+    public function __construct(string $model, string $tableName, array $entrypoint) {
         $this->name = $model;
         $this->tableName = $tableName;
-        $this->entrypoints = $entrypoints;
+        $this->entrypoint = $entrypoint;
     }
 
     /**
@@ -38,6 +38,23 @@ class EntrypointModel extends Relations\BeforeAfterCallbacks
      */
     public function getEntryPoints(): array
     {
-        return $this->entrypoints;
+        return $this->entrypoint;
+    }
+
+    /**
+     * @param string $field
+     *
+     * @return array
+     */
+    public function getEntrypoint(string $field): array
+    {
+        if (is_array($this->entrypoint[$field])) {
+            return $this->entrypoint[$field];
+        }
+
+        return [
+            'column' => $this->entrypoint[$field],
+            'dupeInfo' => []
+        ];
     }
 }
