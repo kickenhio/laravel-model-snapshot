@@ -1,5 +1,6 @@
 <?php namespace Kickenhio\LaravelSqlSnapshot;
 
+use Kickenhio\LaravelSqlSnapshot\Exceptions\InvalidManifestSyntaxException;
 use Kickenhio\LaravelSqlSnapshot\Query\SnapshotQueryDumpBuilder;
 use Kickenhio\LaravelSqlSnapshot\Structure\DatabaseManifest;
 use Kickenhio\LaravelSqlSnapshot\Structure\ManifestBuilder;
@@ -21,6 +22,7 @@ class LaravelSqlSnapshot
      * @param string $manifest
      *
      * @return SnapshotQueryDumpBuilder
+     * @throws InvalidManifestSyntaxException
      */
     public function fromManifest(string $manifest): SnapshotQueryDumpBuilder
     {
@@ -37,6 +39,7 @@ class LaravelSqlSnapshot
      * @param string $path
      *
      * @return DatabaseManifest
+     * @throws InvalidManifestSyntaxException
      */
     public function buildManifest(string $path): DatabaseManifest
     {

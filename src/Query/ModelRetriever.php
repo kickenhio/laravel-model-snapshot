@@ -60,7 +60,7 @@ class ModelRetriever
      * @param bool $wrapTransaction
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     public function toSql(bool $wrapTransaction = true): Queries
     {
@@ -72,10 +72,10 @@ class ModelRetriever
      *
      * @param Model $model
      * @param int $modelID
-     * @param object|null $parent
+     * @param Row|null $parent
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     protected function ImportModel(Model $model, int $modelID, Row $parent = null): Queries
     {
@@ -116,7 +116,7 @@ class ModelRetriever
      * @param BeforeAfterCallbacks $relation
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     protected function prepareQueryBlock(Collection $result, BeforeAfterCallbacks $relation): Queries
     {
@@ -159,7 +159,7 @@ class ModelRetriever
      * @param Row|null $parent
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     protected function ImportRelation(Table $relation, string $value, Row $parent = null): Queries {
         $records = $this->builder->getConnection()
@@ -198,16 +198,11 @@ class ModelRetriever
      * @param Dropper $relation
      * @param string $subQuery
      * @return Queries
-     * @throws \Exception
      */
     protected function ImportDroppers(Dropper $relation, string $subQuery): Queries
     {
         $queries = new Queries();
         $select = "SELECT {$relation->getInput()} FROM {$relation->getTableName()} WHERE {$subQuery}";
-
-        if (! $relation instanceof BeforeAfterCallbacks) {
-            return $queries->append("DELETE FROM {$relation->getTableName()} WHERE {$subQuery};");
-        }
 
         foreach ($relation->getBefore() as $item) {
             if ($item instanceof Dropper) {
@@ -231,7 +226,7 @@ class ModelRetriever
      * @param Row $record
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     private function retrieveJsonRelations(Relation $model, Row $record): Queries
     {
@@ -272,7 +267,7 @@ class ModelRetriever
      * @param Row $record
      *
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     protected function retrieveRelations(Collection $relations, Row $record): Queries
     {
@@ -283,13 +278,17 @@ class ModelRetriever
                 return $queries->merge($this->retrieveJsonRelations($model, $record));
             }
 
+            if (is_null($rowValue = $record->property($input))) {
+                return $queries;
+            }
+
             switch (true) {
-                case ($model instanceof Model && !is_null($value = $record->property($input))):
-                    return $queries->merge($this->ImportModel($model, $value, $record));
-                case ($model instanceof Table && !is_null($value = $record->property($input))):
-                    return $queries->merge($this->ImportRelation($model, $value, $record));
-                case ($model instanceof Dropper && !is_null($record->property($input))):
-                    return $queries->merge($this->ImportDroppers($model, "{$model->getReference()} = {$record->property($input)}"));
+                case ($model instanceof Model):
+                    return $queries->merge($this->ImportModel($model, $rowValue, $record));
+                case ($model instanceof Table):
+                    return $queries->merge($this->ImportRelation($model, $rowValue, $record));
+                case ($model instanceof Dropper):
+                    return $queries->merge($this->ImportDroppers($model, "{$model->getReference()} = {$rowValue}"));
             }
 
             return $queries;

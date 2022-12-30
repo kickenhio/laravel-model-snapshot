@@ -1,11 +1,13 @@
 <?php namespace Kickenhio\LaravelSqlSnapshot\Query;
 
 use Illuminate\Support\Collection;
+use Kickenhio\LaravelSqlSnapshot\Exceptions\InvalidManifestSyntaxException;
 
 class SnapshotResult
 {
     protected string $model;
     protected Collection $rows;
+    protected array $proposals;
 
     public function __construct(Collection $rows, array $proposals = [])
     {
@@ -77,7 +79,7 @@ class SnapshotResult
 
     /**
      * @return Queries
-     * @throws \Exception
+     * @throws InvalidManifestSyntaxException
      */
     public function toSql(): Queries
     {
