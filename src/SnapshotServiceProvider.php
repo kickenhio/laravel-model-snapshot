@@ -1,6 +1,7 @@
 <?php namespace Kickenhio\LaravelSqlSnapshot;
 
 use Illuminate\Support\ServiceProvider;
+use Kickenhio\LaravelSqlSnapshot\Commands\GenerateManifest;
 use Kickenhio\LaravelSqlSnapshot\Commands\SnapshotCommand;
 
 class SnapshotServiceProvider extends ServiceProvider
@@ -34,8 +35,10 @@ class SnapshotServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([ $this->getConfigFile() => config_path('snapshot.php') ], 'config');
             $this->publishes([ $this->getManifestFile() => resource_path('example.json') ], 'manifest');
-            $this->commands([SnapshotCommand::class]);
-        } else {
+            $this->commands([SnapshotCommand::class, GenerateManifest::class]);
+        }
+
+        if (config('snapshot.api_enabled', false)) {
             $this->loadRoutesFrom(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'routes.php');
         }
     }

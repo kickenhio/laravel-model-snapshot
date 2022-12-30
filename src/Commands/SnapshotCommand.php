@@ -29,7 +29,7 @@ class SnapshotCommand extends Command
         try {
             $snapshot = SnapshotSQL::fromManifest($this->argument('manifest'));
 
-            foreach ($this->argument('id', []) as $id) {
+            foreach ($this->argument('id') as $id) {
                 foreach ($snapshot->retrieve($this->argument('model'), $id)->toSql() as $query) {
                     if (substr($query, 0, 2) !== '--') {
                         $this->getOutput()->text($query . PHP_EOL);

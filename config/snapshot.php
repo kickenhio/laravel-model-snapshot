@@ -3,6 +3,7 @@
 return [
     'warnings'  => false,
     'api_prefix' => 'snapshot/api',
+    'api_enabled' => true,
     'manifests' => [
         'example' => [
             'file_path'  => resource_path('example.json'),
