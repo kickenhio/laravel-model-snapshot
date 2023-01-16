@@ -27,6 +27,9 @@ class ManifestAttributeMutation
         return $this->columnName;
     }
 
+    /**
+     * @return mixed|null
+     */
     public function getValueMutated()
     {
         switch ($this->method) {
@@ -37,10 +40,16 @@ class ManifestAttributeMutation
         return $this->value;
     }
 
+    /**
+     * @return mixed
+     */
     public function getStaticValue() {
         return $this->value;
     }
 
+    /**
+     * @return null
+     */
     public function getFakerValue() {
         $faker = Factory::create();
 

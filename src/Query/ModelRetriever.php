@@ -307,18 +307,18 @@ class ModelRetriever
         $values = [];
 
         foreach ($record->data() as $attribute => $value) {
-            //if ($tm = $this->manifest->getTableMutation($table) AND $tm->isColumnIgnored($attribute)) {
-            //    continue;
-            //}
+            if ($tm = $this->builder->getManifest()->getTableMutation($record->tableName()) AND $tm->isColumnIgnored($attribute)) {
+                continue;
+            }
 
             $columns[] = "`{$attribute}`";
 
-            //if (
-            //    $tableMutation = $this->builder->getManifest()->getTableMutation($table) AND
-            //    $columnMutation = $tableMutation->getAttributeMutation($attribute)
-            //) {
-            //    $value = $columnMutation->getValueMutated();
-            //}
+            if (
+                $tableMutation = $this->builder->getManifest()->getTableMutation($record->tableName()) AND
+                $columnMutation = $tableMutation->getAttributeMutation($attribute)
+            ) {
+                $value = $columnMutation->getValueMutated();
+            }
 
             if (is_null($value)) {
                 $value = 'NULL';
