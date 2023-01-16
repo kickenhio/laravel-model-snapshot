@@ -6,6 +6,8 @@ use Kickenhio\LaravelSqlSnapshot\Structure\Mutations\TableDataMutations;
 
 class ManifestBuilder
 {
+    protected string $path;
+
     public function __construct(string $path) {
         $this->path = $path;
     }
@@ -20,7 +22,7 @@ class ManifestBuilder
         $manifest = new DatabaseManifest();
 
         if (!isset($config['models'])) {
-            throw new InvalidManifestSyntaxException('Config must have "models" config. Otherwise is like Usain Bolt without legs');
+            throw new InvalidManifestSyntaxException('Config must have "models" config.');
         }
 
         foreach ($config['models'] as $name => $model) {

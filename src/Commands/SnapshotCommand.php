@@ -12,7 +12,7 @@ class SnapshotCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'sql-snapshot {manifest} {model} {id*}';
+    protected $signature = 'sql-snapshot:dump {manifest} {model} {id*}';
 
     /**
      * The console command description.

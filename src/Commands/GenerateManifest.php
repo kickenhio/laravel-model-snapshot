@@ -2,9 +2,7 @@
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Kickenhio\LaravelSqlSnapshot\Exceptions\InvalidManifestSyntaxException;
 use Symfony\Component\Console\Command\Command as CommandAlias;
-use Kickenhio\LaravelSqlSnapshot\Facades\Snapshot as SnapshotSQL;
 
 class GenerateManifest extends Command
 {
@@ -34,54 +32,119 @@ class GenerateManifest extends Command
     protected string $connection;
 
     /**
+     * @var array<string>
+     */
+    protected array $models = [];
+
+    /**
      * @return int
      */
     public function handle(): int
     {
+        $added = [];
         $this->connection = $this->argument('connection');
         $this->dbName = DB::connection($this->connection)->getDatabaseName();
-        $models = [];
-        $pairNames = [];
+        $filename = sprintf('%s.json',$this->ask('Filename?', 'example'));
+
+        $rootNode = [
+            'models' => [],
+            'table_mutations' => []
+        ];
+
+        if (file_exists(resource_path($filename))) {
+            $rootNode = json_decode(file_get_contents(resource_path($filename)), true);
+            foreach ($rootNode['models'] as $name => $struct) {
+                $this->models[$name] = $struct['table'];
+            }
+        }
 
         while (!empty($table = $this->askWithCompletion('Select table for Model', ['ecommerce_clients']))) {
             do { $modelName = $this->ask('Model name'); } while (empty($modelName));
-            $pairNames[$modelName] = $table;
+            $this->models[$modelName] = $table;
+            $added[$modelName] = $table;
         }
 
-        foreach ($pairNames as $name => $table) {
-            $models[$name] = [
+        foreach ($added as $name => $table) {
+            $this->output->success("Processing model $name");
+
+            $rootNode['models'][$name] = [
                 'table' => $table,
                 'entrypoint' => [
                     'ID' => 'id'
                 ],
-                'before' => $this->retrieveBefore($table),
-                'after'  => $this->retrieveAfter($table),
+                'before' => $this->retrieveBefore($table, [$table]),
+                'after'  => $this->retrieveAfter($table, [$table]),
             ];
         }
 
-        $rootNode = [
-            'models' => $models,
-            'table_mutations' => []
-        ];
-
-        file_put_contents(resource_path($this->ask('Filename?', 'example').'output.json'), json_encode($rootNode, JSON_PRETTY_PRINT));
+        file_put_contents(resource_path($filename), json_encode($rootNode, JSON_PRETTY_PRINT));
 
         return CommandAlias::SUCCESS;
     }
 
     /**
-     * @param $table
+     * @param string $table
+     *
+     * @return string|null
+     */
+    private function selectModelNode(string $table): ?string {
+        $matches = [];
+        $default = 'None';
+
+        foreach ($this->models as $model => $tableName) {
+            if ($tableName == $table) {
+                $matches[] = $model;
+            }
+        }
+
+        if (count($matches) < 1) {
+            return null;
+        }
+
+        if (count($matches) == 1) {
+            $default = $matches[0];
+        }
+
+        if ('None' !== $choice = $this->choice("Found model associated for table '$table'. Use it as relation?", array_merge(['None'], $matches), $default)) {
+            return $choice;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $table
+     * @param array $chain
      *
      * @return array
      */
-    private function retrieveBefore($table): array
+    private function retrieveBefore(string $table, array $chain): array
     {
+        $this->output->warning("Begin associate before relations for $table");
+
         $before = [];
-        $relations = DB::connection($this->connection)->select("SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA = '{$this->dbName}' AND TABLE_NAME = '{$table}'");
+        $relations = DB::connection($this->connection)->select("
+            SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE CONSTRAINT_SCHEMA = '{$this->dbName}'
+            AND TABLE_NAME = '{$table}'"
+        );
 
         foreach ($relations as $index) {
             if (!is_null($index->REFERENCED_TABLE_SCHEMA)) {
                 if ($table == $index->REFERENCED_TABLE_NAME) {
+                    continue;
+                }
+
+                $plus = array_merge($chain, [$index->REFERENCED_TABLE_NAME]);
+                $this->info(implode('->', $plus));
+
+                if ($modelNode = $this->selectModelNode($index->REFERENCED_TABLE_NAME)) {
+                    $before[] = [
+                        "method"    => "model",
+                        "model"     => $modelNode,
+                        "input"     => $index->COLUMN_NAME
+                    ];
+
                     continue;
                 }
 
@@ -90,8 +153,8 @@ class GenerateManifest extends Command
                     "table"     => $index->REFERENCED_TABLE_NAME,
                     "input"     => $index->COLUMN_NAME,
                     "reference" => $index->REFERENCED_COLUMN_NAME,
-                    'before'    => $this->retrieveBefore($index->REFERENCED_TABLE_NAME),
-                    //'after'     => $this->retrieveAfter($index->REFERENCED_TABLE_NAME),
+                    'before'    => $this->retrieveBefore($index->REFERENCED_TABLE_NAME, $plus),
+                    'after'     => $this->retrieveAfter($index->REFERENCED_TABLE_NAME, $plus),
                 ];
 
                 $before[] = array_filter($node);
@@ -103,13 +166,18 @@ class GenerateManifest extends Command
 
     /**
      * @param $table
+     * @param array $chain
      *
      * @return array
      */
-    private function retrieveAfter($table): array
+    private function retrieveAfter($table, array $chain): array
     {
         $after = [];
-        $relations = DB::connection($this->connection)->select("SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE CONSTRAINT_SCHEMA = '{$this->dbName}' AND REFERENCED_TABLE_NAME = '{$table}'");
+        $relations = DB::connection($this->connection)->select("
+            SELECT * FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+            WHERE CONSTRAINT_SCHEMA = '{$this->dbName}' 
+            AND REFERENCED_TABLE_NAME = '{$table}'
+        ");
 
         foreach ($relations as $index) {
             if (!is_null($index->REFERENCED_TABLE_SCHEMA)) {
@@ -117,7 +185,25 @@ class GenerateManifest extends Command
                     continue;
                 }
 
-                if (!$this->confirm("Should {$table} load data from {$index->TABLE_NAME}.{$index->COLUMN_NAME}")) {
+                if (count($chain) > 1 AND $chain[count($chain)-2] === $index->TABLE_NAME) {
+                    continue;
+                }
+
+                $plus = array_merge($chain, [$index->TABLE_NAME]);
+                $this->info(implode('->', $plus) . '?');
+
+                if (!$this->confirm("Should import all '{$index->TABLE_NAME}' which has '{$index->COLUMN_NAME}' equal {$table}.{$index->REFERENCED_COLUMN_NAME}")) {
+                    continue;
+                }
+
+                if ($modelNode = $this->selectModelNode($index->TABLE_NAME)) {
+                    $after[] = [
+                        "method"    => "model",
+                        "model"     => $modelNode,
+                        "input"     => $index->REFERENCED_COLUMN_NAME
+                    ];
+
+                    $this->output->info("Pair table {$index->TABLE_NAME} for {$table}.{$index->REFERENCED_COLUMN_NAME} values");
                     continue;
                 }
 
@@ -126,10 +212,11 @@ class GenerateManifest extends Command
                     "table"     => $index->TABLE_NAME,
                     "input"     => $index->REFERENCED_COLUMN_NAME,
                     "reference" => $index->COLUMN_NAME,
-                    'before'    => $this->retrieveBefore($index->TABLE_NAME),
-                    //'after'     => $this->retrieveAfter($index->TABLE_NAME),
+                    'before'    => $this->retrieveBefore($index->TABLE_NAME, $plus),
+                    'after'     => $this->retrieveAfter($index->TABLE_NAME, $plus),
                 ];
 
+                $this->output->info("Pair table {$index->TABLE_NAME} for {$table}.{$index->REFERENCED_COLUMN_NAME} values");
                 $after[] = array_filter($node);
             }
         }
