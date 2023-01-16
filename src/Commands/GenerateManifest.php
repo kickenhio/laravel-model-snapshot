@@ -60,6 +60,7 @@ class GenerateManifest extends Command
 
         while (!empty($table = $this->askWithCompletion('Select table for Model', ['ecommerce_clients']))) {
             do { $modelName = $this->ask('Model name'); } while (empty($modelName));
+
             $this->models[$modelName] = $table;
             $added[$modelName] = $table;
         }
@@ -75,6 +76,10 @@ class GenerateManifest extends Command
                 'before' => $this->retrieveBefore($table, [$table]),
                 'after'  => $this->retrieveAfter($table, [$table]),
             ];
+
+            if (!empty($mutate = $this->applyMutations($table))) {
+                $rootNode['table_mutations'][$table] = $mutate;
+            }
         }
 
         file_put_contents(resource_path($filename), json_encode($rootNode, JSON_PRETTY_PRINT));
@@ -222,5 +227,51 @@ class GenerateManifest extends Command
         }
 
         return $after;
+    }
+
+    /**
+     * @param string $table
+     *
+     * @return array
+     */
+    private function applyMutations(string $table): array
+    {
+        $mutations = [
+            'ignore'     => [],
+            'attributes' => []
+        ];
+
+        $tableData = DB::connection($this->connection)->select("
+            SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_SCHEMA = '{$this->dbName}' 
+            AND TABLE_NAME = '{$table}'
+        ");
+
+        $fakers = [
+            'city' => 'city',
+            'email' => 'email',
+            'street' => 'street',
+            'lastName' => 'lastName',
+            'last_name' => 'lastName',
+            'firstName' => 'firstName',
+            'first_name' => 'firstName',
+        ];
+
+        foreach ($tableData as $columnData) {
+            if ($columnData->EXTRA == 'VIRTUAL GENERATED') {
+                $mutations['ignore'][] = $columnData->COLUMN_NAME;
+            }
+
+            foreach ($fakers as $pattern => $faker) {
+                if (isset($fakers[$columnData->COLUMN_NAME])) {
+                    $mutations['attributes'][$columnData->COLUMN_NAME] = [
+                        "method" => "faker",
+                        "value"  => $pattern
+                    ];
+                }
+            }
+        }
+
+        return array_filter($mutations);
     }
 }
